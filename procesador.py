@@ -81,11 +81,29 @@ def transformar(datos):
     datos = datos.loc[validos, ["Empleado"]].copy()
     datos["Instante"] = pd.to_datetime(fechas.loc[validos])
     datos["Fecha"] = datos["Instante"].dt.normalize()
-    # mergesort mantiene el orden original si hay dos marcas idénticas.
+    # Ordenar las marcaciones por hora.
     datos = datos.sort_values(["Empleado", "Fecha", "Instante"], kind="mergesort")
-    datos["Orden"] = datos.groupby(["Empleado", "Fecha"]).cumcount() + 1
     datos["Hora"] = datos["Instante"].dt.strftime("%H:%M:%S")
-    matriz = datos.pivot(index=["Empleado", "Fecha"], columns="Orden", values="Hora")
+
+    # Excepción: conservar solo estas cuatro marcaciones de Jordan el 13/08/2026.
+    caso_jordan = (
+        datos["Empleado"].eq("AYALA LOPEZ JORDAN ALEXIS")
+        & datos["Fecha"].eq(pd.Timestamp("2026-08-13"))
+    )
+    horas_conservar = {"07:59:00", "13:24:00", "14:03:00", "16:50:00"}
+
+    datos = datos.loc[
+        ~caso_jordan | datos["Hora"].isin(horas_conservar)
+    ].copy()
+
+    # Volver a numerar después del filtro para obtener Marcación 1 a 4.
+    datos["Orden"] = datos.groupby(["Empleado", "Fecha"]).cumcount() + 1
+
+    matriz = datos.pivot(
+        index=["Empleado", "Fecha"],
+        columns="Orden",
+        values="Hora"
+    )
     matriz.columns = [f"Marcación {numero}" for numero in matriz.columns]
     matriz = matriz.reset_index()
     cantidades = datos.groupby(["Empleado", "Fecha"]).size().rename("N.º marcaciones").reset_index()
